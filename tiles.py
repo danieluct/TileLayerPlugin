@@ -20,10 +20,37 @@
  ***************************************************************************/
 """
 import math
+import ast
+import operator as op
 
 from PyQt4.QtCore import QRect
 from PyQt4.QtGui import QImage, QPainter
 from qgis.core import QgsRectangle
+from re import sub
+
+# supported operators
+operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Mod: op.mod,
+             ast.Div: op.truediv, ast.Pow: op.pow, ast.BitXor: op.xor,
+             ast.USub: op.neg, ast.FloorDiv: op.floordiv}
+
+def eval_expr(expr):
+    #expression format is: {arithmetic expression[,zero-padding]}  
+    elems = expr.group(0)[1:-1].split(',')
+        padding = elems[1]
+    else:
+        padding = '0'
+    expr = elems[0]
+    return format((eval_(ast.parse(expr, mode='eval').body)),'0'+padding)
+
+def eval_(node):
+    if isinstance(node, ast.Num): # <number>
+        return node.n
+    elif isinstance(node, ast.BinOp): # <left> <operator> <right>
+        return operators[type(node.op)](eval_(node.left), eval_(node.right))
+    elif isinstance(node, ast.UnaryOp): # <operator> <operand> e.g., -1
+        return operators[type(node.op)](eval_(node.operand))
+    else:
+        raise TypeError(node)
 
 R = 6378137
 
@@ -84,7 +111,10 @@ class TileLayerDefinition:
   def tileUrl(self, zoom, x, y):
     if not self.yOriginTop:
       y = (2 ** zoom - 1) - y
-    return self.serviceUrl.replace("{z}", str(zoom)).replace("{x}", str(x)).replace("{y}", str(y))
+    #replace x,y,z in url
+    primary_url = self.serviceUrl.replace("{z}", str(zoom)).replace("{x}", str(x)).replace("{y}", str(y))
+    #solve arithmetic expressions, if present
+    return sub('{[^}]+}',eval_expr,primary_url)
 
   def getTileRect(self, zoom, x, y):
     size = self.TSIZE1 / 2 ** (zoom - 1)
