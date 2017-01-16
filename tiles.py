@@ -36,6 +36,7 @@ operators = {ast.Add: op.add, ast.Sub: op.sub, ast.Mult: op.mul, ast.Mod: op.mod
 def eval_expr(expr):
     #expression format is: {arithmetic expression[,zero-padding]}  
     elems = expr.group(0)[1:-1].split(',')
+    if len(elems)==2 and len(elems[1])>0:
         padding = elems[1]
     else:
         padding = '0'
